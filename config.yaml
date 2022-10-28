@@ -1,0 +1,23 @@
+# ADGSTUDIOS 2022 - config.yaml
+themes:
+  - theme: vanilla
+    path: themes/vanilla.docx
+    # This is the default theme, so it will be used if no theme is specified
+    default: true
+
+linkedin_profile:  
+  # LinkedIn profile URL
+  url: https://za.linkedin.com/in/adgsenpai
+
+info:  
+  phone: +1 123 456 7890  
+  email: example@example.com
+  location: New York, NY
+  discord: your-discord-username#1234
+  instant: your-instant-number
+  website: https://example.com
+  headline: Mathematican and Computer Scientist
+
+
+  
+  

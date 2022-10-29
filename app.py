@@ -43,6 +43,20 @@ broswer = webdriver.Chrome(
 
 broswer.get(url)
 
+#login 
+def login(username,password):
+    try:
+        broswer.find_element_by_class_name('authwall-join-form__form-toggle--bottom form-toggle').click()
+        broswer.find_element_by_id('session_key').send_keys(username)
+        broswer.find_element_by_id('session_password').send_keys(password)
+        broswer.find_element_by_class_name('sign-in-form__submit-button').click()        
+    except:
+        pass
+
+login(config['linkedin_profile']['username'],config['linkedin_profile']['password'])
+
+# go to profile url
+broswer.get(url)
 
 # get all html code from the page
 html = broswer.page_source

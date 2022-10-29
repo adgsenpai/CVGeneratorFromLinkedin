@@ -3,3 +3,4 @@ pyyaml
 python-docx
 qrcode
 cairosvg
+pillow

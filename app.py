@@ -1,5 +1,8 @@
+from email.mime import image
 import json
+import profile
 from re import template
+from turtle import Shape
 import bs4 as bs
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -8,9 +11,17 @@ import yaml
 import requests
 import urllib
 import os
+import cairosvg
+import numpy as np
+from PIL import Image, ImageDraw
 # open config.yaml
 with open('config.yaml', 'r') as f:
     config = yaml.safe_load(f)
+
+# create images folder if not exists
+if not os.path.exists('images'):
+    os.makedirs('images')
+
 
 
 url = config['linkedin_profile']['url']
@@ -35,7 +46,8 @@ broswer.get(url)
 
 # get all html code from the page
 html = broswer.page_source
-broswer.close()
+
+broswer.quit()
 
 soup = bs.BeautifulSoup(html, 'html.parser')
 
@@ -173,6 +185,12 @@ for publication in publications:
     pubs.append(pub)
 
 
+import qrcode
+img = qrcode.make(profileinfo['website'])
+img.save('images/qrcode.png')
+
+
+
 # save the data in a json file
 data = {
     'name': name,
@@ -182,21 +200,19 @@ data = {
     'certifications': certs,
     'publications': pubs,
     'profile_info': profileinfo,
-    'linkedin_url': url
+    'linkedin_url': url,
+    'qrcode': 'images/qrcode.png',
 }
 
 
 
-# create images folder if not exists
-if not os.path.exists('images'):
-    os.makedirs('images')
 
 # save all images in images folder with extension as downloaded
 
-
-
-def downloadImages(arr):
-    imageindex = 0
+global imageindex
+imageindex = 0
+def downloadImages(arr):    
+    global imageindex
     for a in arr:
         try:            
             imageurl = a['image']
@@ -204,17 +220,49 @@ def downloadImages(arr):
             image = requests.get(imageurl) 
             # check if image is a jpeg or svg
             if image.headers['Content-Type'] == 'image/jpeg':
-                extension = '.jpg'
-            else:
-                extension = '.svg'
-            # save image
-            with open('images/' + str(imageindex) + extension, 'wb') as f:
-                f.write(image.content)
-            # update image url in json
-            a['image'] = 'images/' + str(imageindex) + extension
+                with open('images/' + str(imageindex) + '.jpg', 'wb') as f:
+                    f.write(image.content)                
+                    a['image'] = 'images/' + str(imageindex) + '.jpg'
+            else:                
+                with open('images/' + str(imageindex) + '.svg', 'wb') as f:
+                    f.write(image.content)
+                #convert svg using cairosvg
+                cairosvg.svg2png(url='images/' + str(imageindex) + '.svg', write_to='images/' + str(imageindex) + '.png')
+                a['image'] = 'images/' + str(imageindex) + '.png'
+                                                                      
             imageindex += 1
         except:
             pass
+
+profilephoto = soup.find('div', class_='top-card__profile-image-container top-card-layout__entity-image-container flex top-card__profile-image-container--cvw-fix')
+profilephoto = profilephoto.find('img')['src']
+profilephoto = requests.get(profilephoto)
+with open('images/profilephoto.jpg', 'wb') as f:
+    f.write(profilephoto.content)
+
+# Open the input image as numpy array, convert to RGB
+img=Image.open("images/profilephoto.jpg").convert("RGB")
+npImage=np.array(img)
+h,w=img.size
+
+# Create same size alpha layer with circle
+alpha = Image.new('L', img.size,0)
+draw = ImageDraw.Draw(alpha)
+draw.pieslice([0,0,h,w],0,360,fill=255)
+
+# Convert alpha Image to numpy array
+npAlpha=np.array(alpha)
+
+# Add alpha layer to RGB
+npImage=np.dstack((npImage,npAlpha))
+
+# Save with alpha
+Image.fromarray(npImage).save('images/profilephoto.png')
+
+data['profile_photo'] = 'images/profilephoto.png'
+
+
+
 
 downloadImages(jobs)
 downloadImages(edus)
@@ -235,12 +283,13 @@ from docx.shared import Cm, Inches, Mm, Emu
 
 template = DocxTemplate(themes)
 
+data['qrcode'] = InlineImage(template, 'images/qrcode.png', width=Mm(30.27))
 
 # set all InlineImages
 def setInlineImages(arr):
     for a in arr:
         try:
-            a['image'] = InlineImage(template, a['image'], width=Mm(20))
+            a['image'] = InlineImage(template, a['image'], width=Mm(15.19))
         except:
             pass
 
@@ -248,6 +297,9 @@ setInlineImages(jobs)
 setInlineImages(edus)
 setInlineImages(certs)
 setInlineImages(pubs)
+
+#set profile photo as InlineImage circle
+data['profile_photo'] = InlineImage(template, 'images/profilephoto.png', width=Mm(25.82), height=Mm(25.82))
 
 template.render(data)
 

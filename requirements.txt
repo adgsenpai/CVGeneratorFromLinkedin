@@ -1,1 +1,5 @@
 selenium
+yaml
+python-docx
+qrcode
+cairosvg

@@ -1,15 +1,12 @@
-from email.mime import image
+from docx.shared import Mm
+from docxtpl import DocxTemplate, InlineImage
+import qrcode
+import re
 import json
-import profile
 from re import template
-from turtle import Shape
 import bs4 as bs
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 import yaml
 import requests
-import urllib
 import os
 import cairosvg
 import numpy as np
@@ -22,10 +19,9 @@ with open('config.yaml', 'r') as f:
 if not os.path.exists('images'):
     os.makedirs('images')
 
-
+themes = config['themes'][0]['path']
 
 url = config['linkedin_profile']['url']
-
 profileinfo = {
     'phone': config['info']['phone'],
     'email': config['info']['email'],
@@ -36,34 +32,18 @@ profileinfo = {
     'headline': config['info']['headline'],
 }
 
-themes = config['themes'][0]['path']
-
-broswer = webdriver.Chrome(
-    executable_path='./chromedriver_win32/chromedriver.exe')
-
-broswer.get(url)
-
-#login 
-def login(username,password):
-    try:
-        broswer.find_element_by_class_name('authwall-join-form__form-toggle--bottom form-toggle').click()
-        broswer.find_element_by_id('session_key').send_keys(username)
-        broswer.find_element_by_id('session_password').send_keys(password)
-        broswer.find_element_by_class_name('sign-in-form__submit-button').click()        
-    except:
-        pass
-
-login(config['linkedin_profile']['username'],config['linkedin_profile']['password'])
-
-# go to profile url
-broswer.get(url)
-
-# get all html code from the page
-html = broswer.page_source
-
-broswer.quit()
-
-soup = bs.BeautifulSoup(html, 'html.parser')
+# if scrape.html exists
+if os.path.exists('scrape.html'):
+    # open scrape.html
+    with open('scrape.html', 'r', encoding="utf8") as f:
+        html = f.read()
+    soup = bs.BeautifulSoup(html, 'html.parser')
+else:
+    # kill script
+    def kill():
+        print('Follow the instructions in the README.md file, scrape.html not found!')
+        exit()
+    kill()
 
 # get the name of the person
 name = soup.find(
@@ -77,6 +57,14 @@ experience__list = soup.find_all(
     'li', class_='profile-section-card experience-item')
 
 jobs = []
+
+
+def cleanText(text):
+    text = text.replace('\n', '')
+    text = ' '.join(text.split())
+    text = re.sub('<[^<]+?>', '', text)
+    return text
+
 
 for job in experience__list:
     currentjob = {}
@@ -101,11 +89,12 @@ for job in experience__list:
         'p', class_='experience-item__location experience-item__meta-item').text.strip()
     if (job.find('p', class_='show-more-less-text__text--more')) != None:
         currentjob['description'] = job.find(
-            'p', class_='show-more-less-text__text--more').text.strip()
+            'p', class_='show-more-less-text__text--more').text.strip().replace('\n', '')
+
     else:
         currentjob['description'] = job.find(
-            'p', class_='show-more-less-text__text--less').text.strip()
-    currentjob['image'] = job.find('img')['data-delayed-url']
+            'p', class_='show-more-less-text__text--less').text.strip().replace('\n', '')
+    currentjob['image'] = job.find('img')['src']
     jobs.append(currentjob)
 
 edus = []
@@ -132,10 +121,11 @@ for education in educations:
     try:
         edu['description'] = education.find(
             'div', class_='show-more-less-text').text.strip()
+        edu['description'] = edu['description']
     except:
         edu['description'] = ''
 
-    edu['image'] = education.find('img')['data-delayed-url']
+    edu['image'] = education.find('img')['src']
 
     edus.append(edu)
 
@@ -148,7 +138,7 @@ for certification in certifications:
     cert = {}
     cert['title'] = certification.find(
         'h3', class_='profile-section-card__title').text.strip()
-    cert['image'] = certification.find('img')['data-delayed-url']
+    cert['image'] = certification.find('img')['src']
     cert['subtitle'] = certification.find(
         'h4', class_='profile-section-card__subtitle').text.strip()
     cert['range'] = certification.find(
@@ -177,17 +167,17 @@ for publication in publications:
     pub['title'] = publication.find(
         'h3', class_='profile-section-card__title').text.strip()
     pub['subtitle'] = publication.find(
-        'h4', class_='profile-section-card__subtitle').text.strip().replace('\n', '')
-    # remove unnecessary spaces with a line
-    pub['subtitle'] = ' '.join(pub['subtitle'].split())
-
+        'h4', class_='profile-section-card__subtitle').text.strip()
     try:
         pub['description'] = publication.find(
             'p', class_='show-more-less-text__text--more').text.strip()
+        # remove line breaks
+        pub['description'] = cleanText(pub['description'])
     except:
         try:
             pub['description'] = publication.find(
                 'p', class_='show-more-less-text__text--less').text.strip()
+            pub['description'] = cleanText(pub['description'])
         except:
             pub['description'] = ''
 
@@ -199,16 +189,14 @@ for publication in publications:
     pubs.append(pub)
 
 
-import qrcode
 img = qrcode.make(profileinfo['website'])
 img.save('images/qrcode.png')
 
 
-
 # save the data in a json file
 data = {
-    'name': name,
-    'about': about,
+    'name': cleanText(name),
+    'about': cleanText(about),
     'jobs': jobs,
     'education': edus,
     'certifications': certs,
@@ -218,57 +206,92 @@ data = {
     'qrcode': 'images/qrcode.png',
 }
 
+# clean education
+for edu in data['education']:
+    edu['school'] = cleanText(edu['school'])
+    edu['degree'] = cleanText(edu['degree'])
+    edu['range'] = cleanText(edu['range'])
+    try:
+        edu['activities'] = cleanText(edu['activities'])
+    except:
+        pass
+    edu['description'] = cleanText(edu['description'])
 
+# clean jobs
+for job in data['jobs']:
+    job['title'] = cleanText(job['title'])
+    job['subtitle'] = cleanText(job['subtitle'])
+    job['range'] = cleanText(job['range'])
+    job['location'] = cleanText(job['location'])
+    job['description'] = cleanText(job['description'])
+
+# clean certifications
+for cert in data['certifications']:
+    cert['title'] = cleanText(cert['title'])
+    cert['subtitle'] = cleanText(cert['subtitle'])
+    cert['range'] = cleanText(cert['range'])
+    cert['credentialid'] = cleanText(cert['credentialid'])
+
+# clean publications
+for pub in data['publications']:
+    pub['title'] = cleanText(pub['title'])
+    pub['subtitle'] = cleanText(pub['subtitle'])
+    pub['description'] = cleanText(pub['description'])
 
 
 # save all images in images folder with extension as downloaded
 
 global imageindex
 imageindex = 0
-def downloadImages(arr):    
+
+
+def downloadImages(arr):
     global imageindex
     for a in arr:
-        try:            
+        try:
             imageurl = a['image']
-            #download image
-            image = requests.get(imageurl) 
+            # download image
+            image = requests.get(imageurl)
             # check if image is a jpeg or svg
             if image.headers['Content-Type'] == 'image/jpeg':
                 with open('images/' + str(imageindex) + '.jpg', 'wb') as f:
-                    f.write(image.content)                
+                    f.write(image.content)
                     a['image'] = 'images/' + str(imageindex) + '.jpg'
-            else:                
+            else:
                 with open('images/' + str(imageindex) + '.svg', 'wb') as f:
                     f.write(image.content)
-                #convert svg using cairosvg
-                cairosvg.svg2png(url='images/' + str(imageindex) + '.svg', write_to='images/' + str(imageindex) + '.png')
+                # convert svg using cairosvg
+                cairosvg.svg2png(url='images/' + str(imageindex) +
+                                 '.svg', write_to='images/' + str(imageindex) + '.png')
                 a['image'] = 'images/' + str(imageindex) + '.png'
-                                                                      
+
             imageindex += 1
         except:
             pass
 
-profilephoto = soup.find('div', class_='top-card__profile-image-container top-card-layout__entity-image-container flex top-card__profile-image-container--cvw-fix')
+
+profilephoto = soup.find(
+    'div', class_='top-card__profile-image-container top-card-layout__entity-image-container flex top-card__profile-image-container--cvw-fix')
 profilephoto = profilephoto.find('img')['src']
 profilephoto = requests.get(profilephoto)
 with open('images/profilephoto.jpg', 'wb') as f:
     f.write(profilephoto.content)
 
 # Open the input image as numpy array, convert to RGB
-img=Image.open("images/profilephoto.jpg").convert("RGB")
-npImage=np.array(img)
-h,w=img.size
+img = Image.open("images/profilephoto.jpg").convert("RGB")
+npImage = np.array(img)
+h, w = img.size
 
 # Create same size alpha layer with circle
-alpha = Image.new('L', img.size,0)
+alpha = Image.new('L', img.size, 0)
 draw = ImageDraw.Draw(alpha)
-draw.pieslice([0,0,h,w],0,360,fill=255)
+draw.pieslice([0, 0, h, w], 0, 360, fill=255)
 
 # Convert alpha Image to numpy array
-npAlpha=np.array(alpha)
+npAlpha = np.array(alpha)
 
 # Add alpha layer to RGB
-npImage=np.dstack((npImage,npAlpha))
+npImage = np.dstack((npImage, npAlpha))
 
 # Save with alpha
 Image.fromarray(npImage).save('images/profilephoto.png')
@@ -276,30 +299,24 @@ Image.fromarray(npImage).save('images/profilephoto.png')
 data['profile_photo'] = 'images/profilephoto.png'
 
 
-
-
 downloadImages(jobs)
 downloadImages(edus)
 downloadImages(certs)
 downloadImages(pubs)
 
-        
+
 with open('data.json', 'w') as outfile:
     json.dump(data, outfile)
-  
 
 
-from docx.shared import Cm
-from docxtpl import DocxTemplate, InlineImage
-from docx.shared import Cm, Inches, Mm, Emu
-
-
-
+# for all text remove line breaks and remove extra spaces
 template = DocxTemplate(themes)
 
-data['qrcode'] = InlineImage(template, 'images/qrcode.png', width=Mm(30.27))
+data['qrcode'] = InlineImage(template, 'images/qrcode.png', width=Mm(20))
 
 # set all InlineImages
+
+
 def setInlineImages(arr):
     for a in arr:
         try:
@@ -307,14 +324,17 @@ def setInlineImages(arr):
         except:
             pass
 
+
 setInlineImages(jobs)
 setInlineImages(edus)
 setInlineImages(certs)
 setInlineImages(pubs)
 
-#set profile photo as InlineImage circle
-data['profile_photo'] = InlineImage(template, 'images/profilephoto.png', width=Mm(25.82), height=Mm(25.82))
+# set profile photo as InlineImage circle
+data['profile_photo'] = InlineImage(
+    template, 'images/profilephoto.png', width=Mm(25.82), height=Mm(25.82))
 
 template.render(data)
 
 template.save('cv.docx')
+print('Check out cv.docx!')

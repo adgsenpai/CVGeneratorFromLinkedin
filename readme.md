@@ -39,6 +39,8 @@ info:
 
 Notice that you can set a theme in the `config.yaml` file. If you don't specify a theme, the default theme will be used.
 
+It uses the `Django` language to render outputs. You can refer to `Flask-Django` for more information on how to use the `syntax`
+
 For now there is two themes available:
 - `vanilla` (default)
 - `stock` 

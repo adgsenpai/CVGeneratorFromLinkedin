@@ -53,5 +53,32 @@ But for now, i have disabled selenium, therefore you will need to manually get t
 
 For now selenium is disabled, so you will need to manually get the HTML of your LinkedIn profile and save it as `scrape.html` in the root directory. The LinkedIn `AuthWall` is a pain to get around, so i have disabled it for now.
 
-Go to https://search.google.com/test/mobile-friendly 
+Go to https://search.google.com/test/mobile-friendly set your linkedin profile url
+
+for example i will use mine `https://za.linkedin.com/in/adgsenpai`
+
+![image](https://user-images.githubusercontent.com/45560312/198889388-22a7e30b-3d53-42e8-8538-8977b681bbfa.png)
+
+Then click `TEST URL`
+
+Complete the `CAPTCHA` if required...
+
+Then wait a few minutes ... to process
+
+![image](https://user-images.githubusercontent.com/45560312/198889429-5f4e1bc0-dabe-4545-bc17-cd28e12415e5.png)
+
+
+Once done click `View Tested Page`
+
+![image](https://user-images.githubusercontent.com/45560312/198889443-06c758ca-36b9-47b9-9ee2-aee159d04d4d.png)
+
+`Copy the HTML payload` and save it in `scrape.html` in the directory of the software.
+
+
+
+
+
+
+ 
+
 
